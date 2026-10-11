@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 // App under test: Coffee Cart — https://seleniumbase.io/coffee/
 // Routes: menu — /coffee/, cart — /coffee/cart
@@ -13,50 +13,92 @@ test.describe('Coffee Cart', () => {
     await page.goto('/coffee/');
   });
 
-  test('Smoke: menu loads with drinks list and Total button @smoke', async () => {
-    test.skip(
-      true,
-      'TODO: verify the cup list is visible and the Total/checkout button is visible',
-    );
+  test('Smoke: menu loads with drinks list and Total button @smoke', async ({ page }) => {
+    const cups = page.locator('.cup');
+    const checkoutButton = page.locator('[data-test="checkout"]');
+
+    await expect(cups).toHaveCount(9);
+    await expect(page.getByLabel('Espresso', { exact: true })).toBeVisible();
+    await expect(checkoutButton).toBeVisible();
   });
 
-  test('Adding two different drinks updates the header cart counter and Total', async () => {
-    test.skip(
-      true,
-      'TODO: click two different cups (e.g. by aria-label/data-test), then assert ' +
-        'header "cart (2)" text and that Total equals the sum of the two drink prices',
-    );
+  test('Adding two different drinks updates the header cart counter and Total', async ({
+    page,
+  }) => {
+    await page.getByLabel('Espresso', { exact: true }).click();
+    await page.getByLabel('Cappuccino', { exact: true }).click();
+
+    const cartLink = page.getByRole('link', { name: /cart/i });
+
+    await expect(cartLink).toBeVisible();
+    await expect(cartLink).toHaveText(/cart\s*\(2\)/i);
+
+    await expect(page.locator('[data-test="checkout"]')).toHaveText('Total: $29.00');
   });
 
-  test('Cart page lists exactly the added items', async () => {
-    test.skip(
-      true,
-      'TODO: add 2 drinks, navigate to /coffee/cart, assert item rows ' + 'locator.toHaveCount(2)',
-    );
+  test('Cart page lists exactly the added items', async ({ page }) => {
+    await page.getByLabel('Espresso', { exact: true }).click();
+    await page.getByLabel('Cappuccino', { exact: true }).click();
+
+    await page.getByRole('link', { name: /cart/i }).click();
+
+    const cartItems = page.getByRole('listitem').filter({
+      has: page.getByRole('button', { name: /^Remove all / }),
+    });
+
+    await expect(cartItems).toHaveCount(2);
+    await expect(cartItems.filter({ hasText: 'Espresso' })).toHaveCount(1);
+    await expect(cartItems.filter({ hasText: 'Cappuccino' })).toHaveCount(1);
   });
 
-  test('Increasing item quantity on the cart page updates counter and Total', async () => {
-    test.skip(
-      true,
-      'TODO: on /coffee/cart, click the "+" control for one item, then assert ' +
-        'header cart counter and Total reflect the new quantity/sum',
-    );
+  test('Increasing item quantity on the cart page updates counter and Total', async ({ page }) => {
+    await page.getByLabel('Espresso', { exact: true }).click();
+    await page.getByRole('link', { name: /cart/i }).click();
+
+    await page
+      .getByRole('button', {
+        name: 'Add one Espresso',
+        exact: true,
+      })
+      .click();
+
+    await expect(page.getByRole('link', { name: /cart/i })).toHaveText(/cart\s*\(2\)/i);
+
+    await expect(page.locator('[data-test="checkout"]')).toHaveText('Total: $20.00');
   });
 
-  test('Empty cart shows no items on a fresh session', async () => {
-    test.skip(
-      true,
-      'TODO: navigate straight to /coffee/cart without adding anything, assert ' +
-        'item list locator.toHaveCount(0) (or the list container is hidden)',
-    );
+  test('Empty cart shows no items on a fresh session', async ({ page }) => {
+    await page.getByRole('link', { name: /cart/i }).click();
+
+    const cartItems = page.getByRole('listitem').filter({
+      has: page.getByRole('button', { name: /^Remove all / }),
+    });
+
+    await expect(page.getByRole('link', { name: /cart/i })).toHaveText(/cart\s*\(0\)/i);
+
+    await expect(cartItems).toHaveCount(0);
   });
 
-  test('Payment modal shows Name, Email and Submit', async () => {
-    test.skip(
-      true,
-      'TODO: click the Total/Pay button, assert the payment modal is visible, ' +
-        'then use expect.soft for the Name field, Email field and Submit button',
-    );
+  test('Payment modal shows Name, Email and Submit', async ({ page }) => {
+    await page.getByLabel('Espresso', { exact: true }).click();
+    await page
+      .getByRole('button', {
+        name: 'Proceed to checkout',
+        exact: true,
+      })
+      .click();
+
+    const modal = page.locator('.modal-content').filter({
+      has: page.getByRole('heading', { name: 'Payment details', exact: true }),
+    });
+
+    await expect(modal).toBeVisible();
+
+    await expect.soft(modal.getByLabel('Name', { exact: true })).toBeVisible();
+
+    await expect.soft(modal.getByLabel('Email', { exact: true })).toBeVisible();
+
+    await expect.soft(modal.getByRole('button', { name: 'Submit', exact: true })).toBeVisible();
   });
 
   test.describe('Optional', () => {
